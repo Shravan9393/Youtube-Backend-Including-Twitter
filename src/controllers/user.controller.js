@@ -6,6 +6,8 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import path from "path";
 import jwt from "jsonwebtoken";
 import { console } from "inspector";
+import { subscribe } from "diagnostics_channel";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshToken = async(userId) => {
     try {
@@ -23,96 +25,101 @@ const generateAccessAndRefreshToken = async(userId) => {
     }
 }
 
-// steps to register
-// get user details from fronted
-// details depend on whatever we have taken in user.model.js
-// validation (like , user give valid email , or other thing) -not empty
-// check if user already exists : check using username or email
-// check for images , check fro avvatar
-// if avialable then upload then on cloudaniry , avatar
-// create user object - create entry in db
-// remove password and refresh token fiels from response
-// check for user creation
-// return res
-
 
 const registerUser  = asyncHandler( async (req,res) =>{
-    // return res.status(200).json({
-    //     message : "ok"
-    // })
+  // return res.status(200).json({
+  //     message : "ok"
+  // })
 
-    const { fullName, email, username, password } = req.body;
-    console.log("fullName : ",fullName);
-    console.log("email : ",email);
-    console.log("username : ",username);
-    console.log("password : ", password);
-    // if(fullName === ""){
-    //     throw new ApiError(400, "fullname is required");
-    // }
+  // steps to register
+  // get user details from fronted
+  // details depend on whatever we have taken in user.model.js
+  // validation (like , user give valid email , or other thing) -not empty
+  // check if user already exists : check using username or email
+  // check for images , check fro avvatar
+  // if avialable then upload then on cloudaniry , avatar
+  // create user object - create entry in db
+  // remove password and refresh token fiels from response
+  // check for user creation
+  // return res
 
-    // insted of using above if we can use below 
+  const { fullName, email, username, password } = req.body;
+  console.log("fullName : ", fullName);
+  console.log("email : ", email);
+  console.log("username : ", username);
+  console.log("password : ", password);
+  // if(fullName === ""){
+  //     throw new ApiError(400, "fullname is required");
+  // }
 
-    if(
-        [fullName, email, username, password].some((field) => field?.trim() === "" )){
-        throw new ApiError(400, "All fields are required");
-    }
+  // insted of using above if we can use below
 
-    const existedUser = await User.findOne({
-        $or: [{ username }, { email }],
-    });
+  if (
+    [fullName, email, username, password].some((field) => field?.trim() === "")
+  ) {
+    throw new ApiError(400, "All fields are required");
+  }
 
-    if(existedUser){
-        throw new ApiError(409, "User with email or username already exist");
-    }
+  const existedUser = await User.findOne({
+    $or: [{ username }, { email }],
+  });
 
-    console.log("req.files : ", req.files);
+  if (existedUser) {
+    throw new ApiError(409, "User with email or username already exist");
+  }
 
-    // const avatarLocalPath = req?.files?.avatar?.[0]?.path;
-    // // const coverImageLocalPath = req.files?.coverImage[0]?.path;
-    // const coverImageLocalPath = req?.files?.coverImage?.[0]?.path || "";
+  console.log("req.files : ", req.files);
 
-    const avatarLocalPath = req?.files?.avatar?.[0]?.path? path.normalize(req.files.avatar[0].path) : null;
-    const coverImageLocalPath = req?.files?.coverImage?.[0]?.path? path.normalize(req.files.coverImage[0].path) : null;
+  // const avatarLocalPath = req?.files?.avatar?.[0]?.path;
+  // // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  // const coverImageLocalPath = req?.files?.coverImage?.[0]?.path || "";
 
-    console.log("Normalized avatarLocalPath: ", avatarLocalPath);
-    console.log("Normalized coverImageLocalPath: ", coverImageLocalPath);
+  const avatarLocalPath = req?.files?.avatar?.[0]?.path
+    ? path.normalize(req.files.avatar[0].path)
+    : null;
+  const coverImageLocalPath = req?.files?.coverImage?.[0]?.path
+    ? path.normalize(req.files.coverImage[0].path)
+    : null;
 
+  console.log("Normalized avatarLocalPath: ", avatarLocalPath);
+  console.log("Normalized coverImageLocalPath: ", coverImageLocalPath);
 
+  if (!avatarLocalPath) {
+    console.error("Avatar file is missing from req.files");
+    throw new ApiError(400, "Avatar file is required");
+  }
 
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  const coverImage = coverImageLocalPath
+    ? await uploadOnCloudinary(coverImageLocalPath)
+    : null;
 
-    if(!avatarLocalPath){
-        console.error("Avatar file is missing from req.files");
-        throw new ApiError(400, "Avatar file is required")
-    }
+  if (!avatar) {
+    throw new ApiError(400, "Avatar file is required");
+  }
 
-    const avatar = await uploadOnCloudinary(avatarLocalPath);
-    const coverImage = coverImageLocalPath ? await uploadOnCloudinary(coverImageLocalPath) : null;
+  const user = await User.create({
+    fullName,
+    avatar: avatar.url,
+    coverImage: coverImage?.url || "",
+    email,
+    password,
+    username: username.toLowerCase(),
+  });
 
-    if(!avatar){
-        throw new ApiError(400, "Avatar file is required");
-    }
+  // checking user made or not
 
-    const user = await User.create({
-        fullName,
-        avatar : avatar.url,
-        coverImage : coverImage?.url || "",
-        email,
-        password,
-        username : username.toLowerCase()
-    });
+  const createdUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
 
-    // checking user made or not 
+  if (!createdUser) {
+    throw new ApiError(500, "Something went wrong while registering new user");
+  }
 
-    const createdUser = await User.findById(user._id).select("-password -refreshToken");
-
-    if(!createdUser){
-        throw new ApiError(500, "Something went wrong while registering new user");
-    }
-
-    return res.status(201).json(
-        new ApiResponse(201, createdUser, "User registerd Successfully")
-    );
-
+  return res
+    .status(201)
+    .json(new ApiResponse(201, createdUser, "User registerd Successfully"));
 });
 
 
@@ -330,6 +337,9 @@ const updateUserAvatar = asyncHandler( async(req, res) => {
     .status(200)
     .json(new ApiResponse(200, user, "Avatar updated successfully"));
 
+    // after updating avtar, delete the priviously
+    // uplaoded avatar , write the utility function for this
+    // assignment
 
 });
 
@@ -361,6 +371,131 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
 });
 
+const getUserChannelProfile = asyncHandler( async(req,res) =>{
+    const {username} = req.params
+
+    if(!username?.trim()){
+      throw new ApiError(400, "Username is missing")
+    }
+
+    const channel = await User.aggregate([
+      {
+        $match: {
+          username: username?.toLowerCase(),
+        },
+      },
+      {
+        $lookup: {
+          from: "subscriptions",
+          localField: "_id",
+          foreignField: "channel",
+          as: "subscribers",
+        },
+      },
+      {
+        $lookup: {
+          from: "subscriptions",
+          localField: "_id",
+          foreignField: "subscriber",
+          as: "subscriberTo",
+        },
+      },
+      {
+        $addFields: {
+          subscribersCount: {
+            $size: "$subscribers",
+          },
+          channnelsSubscribedToCount: {
+            $size: "$subscribedTo",
+          },
+          isSubscribed: {
+            $cond: {
+              if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+              then: true,
+              else: false,
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          fullName: 1,
+          username: 1,
+          subscribersCount: 1,
+          channnelsSubscribedToCount: 1,
+          isSubscribed : 1,
+          avatar : 1,
+          coverImage : 1,
+          email : 1,
+        },
+      },
+    ]);
+
+    if(!channel?.length){
+      throw new ApiError(400, "channel does not exists")
+    }
+
+    return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully")
+    )
+});
+
+const getWatchHistory = asyncHandler( async(req,res) => {
+    const user = await User.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(req.user._id),
+
+        }
+      },
+      {
+        $lookup: {
+            from: "videos",
+            localField: "watchHistory",
+            foreignField:"_id",
+            as: "watchHistory",
+            pipeline: [              
+              {
+                $lookup: {
+                  from : "users",
+                  localField: "owner",
+                  foreignField: "_id",
+                  as: "owner",
+                  pipeline: [
+                    {
+                      $project: {
+                        fullName: 1,
+                        username: 1,
+                        avatar: 1
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                $addFields: {
+                  owner:{
+                    $first: "$owner"
+                  }
+                }
+              }
+            ]
+
+        }
+      }
+    ])
+
+    return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200, user[0].watchHistory,
+        "watch Histroy fetched successfully"
+      )
+    )
+});
 
 
 export {
@@ -373,4 +508,6 @@ export {
   updateAccountDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  getUserChannelProfile,
+  getWatchHistory,
 };
