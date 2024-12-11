@@ -96,11 +96,104 @@ const getUserTweets = asyncHandler(async (req, res) => {
   // Return the fetched tweets as a response with a success message
   return res
     .status(200)
-    .json(new ApiResponse(200, tweets[0], "User tweets fetched successfully"));
+    .json(new ApiResponse(200, tweets, "User tweets fetched successfully"));
 });
 
+// Handler to  update the tweetes of a specific user using their twitter id 
+const updateTweet = asyncHandler( async(req,res) => {
+    // get the content and tweet ID
+    const { content } = req.body         //get the content from body
+    const { tweetId } = req.params       // get the tweetId from params
+  
+    // check content is available or not
+
+    if(!content){
+      throw new ApiError(400, "content is required");
+    }
+
+    // is tweetId is valid or not
+
+    if(!isValidObjectId(tweetId)){
+      throw new ApiError(400, "Invalid tweetId");
+    }
+
+    // get the tweet using find by ID.
+
+    const tweet = await Tweet.findById(tweetId)
+
+    // check we got the tweet or not
+
+    if(!tweet){
+      throw new ApiError(404, "tweet not found");
+    }
+
+    // check that owner is accesssing the tweet to update
+    // check that , the tweet you want to update , that twitter id is 
+    // matches with the user requestiong to update the twee
+    if(tweet?.owner.toString() !== req.user?._id.toString){
+      throw new ApiError(400, "Only owner can edit their tweet");
+    }
+
+    // for the update tweet
+
+    const newTweet = await Tweet.findByIdAndUpdate(
+      tweetId,
+      {
+        $set: {
+          content,
+        },
+      },
+      {new : true}
+    );
+
+    // check new tweet is available or not
+    if(!newTweet){
+      throw new ApiError(500, "Failed to edit and update the tweet");
+    }
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, newTweet, "Tweet udated successfully"));
+
+});
+
+// Hand;er to delete the tweets
+
+const deleteTweet = asyncHandler (async(req,res) =>{
+      const { tweetId } = req.params;
+
+      // check tweeter id is vaild or not
+
+      if(!isValidObjectId(tweetId)){
+        throw new ApiError(400, "Invalid tweetId");
+      }
+
+      // get the content from twiiter id
+
+      const tweet = await Tweet.findById(tweetId);
+
+      // check you got the tweet or not
+
+      if(!tweet){
+        throw new ApiError(404, "Tweet not found");
+      }
+
+      // check for  valid user
+      if(tweet?.owner.toString() !== req.user?._id.toString()){
+        throw new ApiError(400, "owner can delet the tweet");
+      }
+
+      await Tweet.findByIdAndDelete(tweetId);
+
+      return res
+      .status(200)
+      .json(new ApiResponse(200, {tweetId}, "Tweet Deleted successfully"));
+
+});
 
 export {
     createTweet,
     getUserTweets,
+    updateTweet,
+    deleteTweet,
 };
