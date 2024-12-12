@@ -26,7 +26,23 @@ cloudinary.config({
         fs.unlinkSync(localFilePath) // remove the locally saved temporary file as the uplaod operation got failed        
         return null;
     }
-  }
+  };
  
+  // delete on cloudinary
 
-  export { uploadOnCloudinary }
+  const deleteOnCloudinary = async (public_id, resource_type = "image") => {
+    try {
+      if(!public_id) return null;
+
+      // delete file from cloudinary
+
+      const result = await cloudinary.uploader.destroy(public_id, {
+        resource_type: `${resource_type}`
+      });
+    } catch (error) {
+      return error;
+      console.log("deleted on cloudinary failed", error);
+    }
+  };
+
+  export { uploadOnCloudinary, deleteOnCloudinary }
