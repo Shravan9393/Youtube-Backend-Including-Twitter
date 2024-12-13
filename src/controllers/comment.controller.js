@@ -5,11 +5,10 @@ import { Video } from "../models/video.model.js";
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
-import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 
 const getVideoComments = asyncHandler(async (req, res) => {
-  // Get all comments for a specific video
+  // Get all comments for a specific videoo
 
   const { videoId } = req.params;
   const { page = 1, limit = 10 } = req.query;
