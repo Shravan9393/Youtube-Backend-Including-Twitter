@@ -100,61 +100,52 @@ const getUserTweets = asyncHandler(async (req, res) => {
 });
 
 // Handler to  update the tweetes of a specific user using their twitter id 
-const updateTweet = asyncHandler( async(req,res) => {
-    // get the content and tweet ID
-    const { content } = req.body         //get the content from body
-    const { tweetId } = req.params       // get the tweetId from params
-  
-    // check content is available or not
+// Handler to update a tweet of a specific user using their tweetId
+const updateTweet = asyncHandler(async (req, res) => {
+    const { content } = req.body; // Get the content to update from the request body
+    const { tweetId } = req.params; // Get the tweetId from request parameters
 
-    if(!content){
-      throw new ApiError(400, "content is required");
+    // Validate that the content to update is provided
+    if (!content) {
+        throw new ApiError(400, "Content is required");
     }
 
-    // is tweetId is valid or not
-
-    if(!isValidObjectId(tweetId)){
-      throw new ApiError(400, "Invalid tweetId");
+    // Validate that the tweetId is a valid MongoDB ObjectId
+    if (!isValidObjectId(tweetId)) {
+        throw new ApiError(400, "Invalid tweetId");
     }
 
-    // get the tweet using find by ID.
+    // Find the tweet using its ID
+    const tweet = await Tweet.findById(tweetId);
 
-    const tweet = await Tweet.findById(tweetId)
-
-    // check we got the tweet or not
-
-    if(!tweet){
-      throw new ApiError(404, "tweet not found");
+    // Check if the tweet exists
+    if (!tweet) {
+        throw new ApiError(404, "Tweet not found");
     }
 
-    // check that owner is accesssing the tweet to update
-    // check that , the tweet you want to update , that twitter id is 
-    // matches with the user requestiong to update the twee
-    if(tweet?.owner.toString() !== req.user?._id.toString){
-      throw new ApiError(400, "Only owner can edit their tweet");
+    // Ensure that the user attempting to update the tweet is the owner
+    if (tweet?.owner.toString() !== req.user?._id.toString()) {
+        throw new ApiError(403, "Only the owner can edit their tweet");
     }
 
-    // for the update tweet
-
-    const newTweet = await Tweet.findByIdAndUpdate(
-      tweetId,
-      {
-        $set: {
-          content,
+    // Update the tweet content using findByIdAndUpdate
+    const updatedTweet = await Tweet.findByIdAndUpdate(
+        tweetId, // Find tweet by its ID
+        {
+            $set: { content }, // Update the content field
         },
-      },
-      {new : true}
+        { new: true } // Return the updated tweet
     );
 
-    // check new tweet is available or not
-    if(!newTweet){
-      throw new ApiError(500, "Failed to edit and update the tweet");
+    // Check if the update was successful
+    if (!updatedTweet) {
+        throw new ApiError(500, "Failed to update the tweet");
     }
 
+    // Return the updated tweet in the response
     return res
-    .status(200)
-    .json(new ApiResponse(200, newTweet, "Tweet udated successfully"));
-
+        .status(200)
+        .json(new ApiResponse(200, updatedTweet, "Tweet updated successfully"));
 });
 
 // Hand;er to delete the tweets
