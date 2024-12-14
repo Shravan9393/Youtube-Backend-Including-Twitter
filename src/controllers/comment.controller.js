@@ -1,7 +1,7 @@
 import mongoose, { isValidObjectId , Schema } from "mongoose";
 import { Comment } from "../models/comment.model.js";
 import { Video } from "../models/video.model.js";
-
+import { Like } from "../models/like.model.js"
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
@@ -151,6 +151,7 @@ const addComment = asyncHandler(async(req, res) => {
     .json(new ApiResponse(200, {comment}, "Comment add Successfuly"))
 });
 
+
 const updateComment = asyncHandler( async(req,res) => {
     // TODO : edit or update a comment
 
@@ -202,6 +203,7 @@ const updateComment = asyncHandler( async(req,res) => {
 
 });
 
+
 // Handler to delete a comment
 const deleteComment = asyncHandler( async(req, res) => {
     // TODO : delete a comment
@@ -218,6 +220,11 @@ const deleteComment = asyncHandler( async(req, res) => {
     }
 
     await Comment.findByIdAndDelete(commentId);
+
+    await Like.deleteMany({
+        comment: commentId,
+        likedBy: req.user,
+    });
 
     return res
     .status(200)

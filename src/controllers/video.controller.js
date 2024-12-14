@@ -6,6 +6,7 @@ import { ApiError } from "../utils/ApiError.js"; // Import custom error handling
 import { ApiResponse } from "../utils/ApiResponse.js"; // Import custom response utility
 import { asyncHandler } from "../utils/asyncHandler.js"; // Import async handler utility for error handling
 import { uploadOnCloudinary, deleteOnCloudinary } from "../utils/cloudinary.js"; // Import cloudinary utilities for file uploads
+import { Comment } from "../models/comment.model.js"
 
 // Handler too get all videos
 // Define the `getAllVideos` controller function, wrapped with `asyncHandler` to handle errors gracefully
@@ -85,22 +86,22 @@ const getAllVideos = asyncHandler(async (req, res) => {
     }
   );
 
-  // Create an aggregation query using the constructed pipeline
+
+  // // Create an aggregation query using the constructed pipeline
   const videoAggregate = Video.aggregate(pipeline);
 
-  // Define options for pagination, including page number and items per page
+  // // Define options for pagination, including page number and items per page
   const options = {
     page: parseInt(page, 10), // Convert the page value to an integer
     limit: parseInt(limit, 10), // Convert the limit value to an integer
   };
 
-  // Execute the aggregation query with pagination using the Video model
-  const video = await Video.aggregatePaginate(videoAggregate, options);
+  
 
   // Return a successful response with the paginated video data
   return res
     .status(200)
-    .json(new ApiResponse(200, video, "Videos fetched successfully"));
+    .json(new ApiResponse(200, videoAggregate, "Videos fetched successfully"));
 });
 
 
@@ -136,12 +137,11 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
   // Validate that the video file was uploaded successfully
   if (!videoFile) {
-    throw new ApiError(400, "Video file not found"); // Throw a 400 error if video upload failed
+    throw new ApiError(400, "Video upload failed");
   }
 
-  // Validate that the thumbnail file was uploaded successfully
   if (!thumbnail) {
-    throw new ApiError(400, "Thumbnail not found"); // Throw a 400 error if thumbnail upload failed
+    throw new ApiError(400, "Thumbnail upload failed");
   }
 
   // Create a new video document in the database with the provided details
@@ -152,6 +152,10 @@ const publishAVideo = asyncHandler(async (req, res) => {
     videoFile: {
       url: videoFile.url, // Set the URL of the uploaded video file
       publicId: videoFile.public_id, // Set the public ID for the video file
+    },
+    thumbnail: {
+      url: thumbnail.url, // URL of the uploaded thumbnail
+      publicId: thumbnail.public_id, // Public ID of the thumbnail
     },
     owner: req.user?._id, // Associate the video with the user who uploaded it
     isPublished: false, // Mark the video as unpublished by default
@@ -305,7 +309,7 @@ const getVideoById = asyncHandler(async (req, res) => {
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params; // Get videoId from request parameters
   // Update video details like title, description, thumbnails
-  const { title, description, thumbnail } = req.body;
+  const { title, description } = req.body;
 
   // Validate videoId
   if (!isValidObjectId(videoId)) {
@@ -333,31 +337,37 @@ const updateVideo = asyncHandler(async (req, res) => {
   }
 
   // Delete the old thumbnail and update with the new one
-  const thumbnailToDelete = video.thumbnail.public_id; // Get public ID of the thumbnail to delete
+  // const thumbnailToDelete = video.thumbnail.public_id; // Get public ID of the thumbnail to delete
   const thumbnailLocalPath = req.file?.path; // Get new thumbnail path
 
+  let cloudinaryResult = null;
   // Validate thumbnail path
-  if (!thumbnailLocalPath) {
-    throw new ApiError(400, "thumbnail is required"); // Throw error if thumbnail is missing
+  if (thumbnailLocalPath) {
+    cloudinaryResult = await uploadOnCloudinary(thumbnailLocalPath);
+    // Delete old thumbnail from Cloudinary
+    if (video.thumbnail?.public_id) {
+      await deleteOnCloudinary(video.thumbnail.public_id);
+    }
   }
 
-  if (!thumbnail) {
-    throw new ApiError(400, "thumbnail not found"); // Throw error if thumbnail is not found
+  // Prepare updated fields
+  const updateFields = {
+    title,
+    description,
+  };
+
+  if (cloudinaryResult) {
+    updateFields.thumbnail = {
+      public_id: cloudinaryResult.public_id,
+      url: cloudinaryResult.url,
+    };
   }
 
   // Update video details in the database
+  // Update the video in the database
   const updatedVideo = await Video.findByIdAndUpdate(
     videoId,
-    {
-      $set: {
-        title, // Update title
-        description, // Update description
-        thumbnail: {
-          public_id: thumbnail.public_id, // Update thumbnail public ID
-          url: thumbnail.url, // Update thumbnail URL
-        },
-      },
-    },
+    { $set: updateFields },
     { new: true } // Return the updated document
   );
 
@@ -366,8 +376,6 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to update video please try again"); // Throw error if update failed
   }
 
-  // Delete the old thumbnail from Cloudinary
-  await deleteOnCloudinary(thumbnailToDelete); // Delete old thumbnail
 
   return res
     .status(200)
@@ -480,5 +488,4 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
-  
 };
