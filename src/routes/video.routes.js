@@ -14,23 +14,15 @@ const router = Router();
 
 // router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
 
-router
-  .route("/")
-  .get(getAllVideos)
-  .post(
-    verifyJWT,
-    upload.fields([
-      {
-        name: "videoFile",
-        maxCount: 1,
-      },
-      {
-        name: "thumbnail",
-        maxCount: 1,
-      },
-    ]),
-    publishAVideo
-  );
+router.route("/").get(getAllVideos);
+router.route("/").post(
+  verifyJWT,
+  upload.fields([
+    { name: "videoFile", maxCount: 1 },
+    { name: "thumbnail", maxCount: 1 },
+  ]),
+  publishAVideo
+);
 
 router
   .route("/v/:videoId")
