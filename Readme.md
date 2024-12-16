@@ -114,8 +114,4 @@ Ensure the following are installed on your system:
 
 ---
 
-## License
-- This project is licensed under the
- -[chai aur code](https://www.youtube.com/@chaiaurcode)
-
 
