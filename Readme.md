@@ -100,11 +100,16 @@ Ensure the following are installed on your system:
 
 3   **Set Up Environment Variables: Create a .env file in the root directory and add the following variables:**
 
-    -MONGO_URI=<your_mongodb_connection_string>
-    -JWT_SECRET=<your_jwt_secret>
-    -CLOUDINARY_NAME=<your_cloudinary_cloud_name>
-    -CLOUDINARY_API_KEY=<your_cloudinary_api_key>
-    -CLOUDINARY_API_SECRET=<your_cloudinary_api_secret>
+    -PORT = 
+    -MONGODB_URI = 
+    -ACCESS_TOKEN_SECRET =
+    -ACCESS_TOKEN_EXPIRY = 
+    -REFRESH_TOKEN_SECRET= 
+    -REFRESH_TOKEN_EXPIRY
+    -CLOUDINARY_CLOUD_NAME = 
+    -CLOUDINARY_API_KEY = 
+    -CLOUDINARY_API_SECRET 
+    -CLOUDINARY_URL
 
 ---
 
