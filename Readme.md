@@ -94,9 +94,8 @@ Ensure the following are installed on your system:
 ---
 
 2  **Navigate to the Project Directory:**
-   ```bash
+   
     cd <project_directory>
-
 ---
 
 3   **Set Up Environment Variables: Create a .env file in the root directory and add the following variables:**
